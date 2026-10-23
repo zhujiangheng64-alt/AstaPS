@@ -82,6 +82,7 @@ public class Player implements PlayerHook, FieldFetch {
     @Getter private String nickname;
     @Getter private String signature;
     @Getter private int headImage;
+    @Getter private int profileFrameId = 100011;
     @Getter private Map<Integer, Set<Integer>> sceneTags;
     @Getter private int nameCardId = 210001;
     @Getter private Position position;
@@ -349,7 +350,7 @@ public class Player implements PlayerHook, FieldFetch {
         this.applyProperties();
         this.applyStartingSceneTags();
         this.getFlyCloakList().add(140001);
-        this.getNameCardList().add(210001);
+        for (int __nc = 210001; __nc <= 210100; __nc++) { this.getNameCardList().add(__nc); }
         setPhlogistonValue(100);
         for(int t=0; t < 20; t++){
             this.getTraceEffectList().add(215001+t);
@@ -496,6 +497,12 @@ public class Player implements PlayerHook, FieldFetch {
 
     public void setHeadImage(int picture) {
         this.headImage = picture;
+        this.updateProfile();
+        this.save();
+    }
+
+    public void setProfileFrameId(int frameId) {
+        this.profileFrameId = frameId;
         this.updateProfile();
         this.save();
     }
@@ -1107,9 +1114,9 @@ public class Player implements PlayerHook, FieldFetch {
             .setNickname(this.getNickname())
             .setPlayerLevel(this.getLevel())
             .setMpSettingType(this.getMpSetting())
-            .setNameCardId(this.getNameCardId())
+            .setNameCardId(this.getNameCardId() == 0 || this.getNameCardId() == 210001 ? 210003 : this.getNameCardId())
             .setSignature(this.getSignature())
-            .setProfilePicture(ProfilePictureHelper.toProto(this.getHeadImage()));
+            .setProfilePicture(ProfilePictureHelper.toProto(this.getHeadImage()).toBuilder().setProfileFrameId(this.getProfileFrameId()).build());
 
         if (this.getWorld() != null) {
             onlineInfo.setCurPlayerNumInWorld(getWorld().getPlayerCount());
@@ -1159,13 +1166,13 @@ public class Player implements PlayerHook, FieldFetch {
 
         return SocialDetail.newBuilder()
             .setUid(this.getUid())
-            .setProfilePicture(ProfilePictureHelper.toProto(this.getHeadImage()))
+            .setProfilePicture(ProfilePictureHelper.toProto(this.getHeadImage()).toBuilder().setProfileFrameId(this.getProfileFrameId()).build())
             .setNickname(this.getNickname())
             .setSignature(this.getSignature())
             .setLevel(this.getLevel())
             .setBirthday(this.getBirthday().getFilledProtoWhenNotEmpty())
             .setWorldLevel(this.getWorldLevel())
-            .setNameCardId(this.getNameCardId())
+            .setNameCardId(this.getNameCardId() == 0 || this.getNameCardId() == 210001 ? 210003 : this.getNameCardId())
             .setIsShowAvatar(this.isShowAvatars())
             .setIsShowConstellationNum(showConstellation)
             .addAllShowAvatarInfoList(socialShowAvatarInfoList)
@@ -1322,13 +1329,15 @@ public class Player implements PlayerHook, FieldFetch {
             // Energy pending expiry must not break the player tick.
         }
 
-        if (this.getWorld() != null) {
+        // Read the world once: a duplicate login can clear it from another thread mid-tick.
+        var world = this.getWorld();
+        if (world != null) {
 
-            this.sendPacket(new PacketWorldPlayerRTTNotify(this.getWorld()));
+            this.sendPacket(new PacketWorldPlayerRTTNotify(world));
 
             long time = System.currentTimeMillis();
-            if (this.getWorld().isMultiplayer() && this.getScene() != null && time > nextSendPlayerLocTime) {
-                this.sendPacket(new PacketWorldPlayerLocationNotify(this.getWorld()));
+            if (world.isMultiplayer() && this.getScene() != null && time > nextSendPlayerLocTime) {
+                this.sendPacket(new PacketWorldPlayerLocationNotify(world));
                 this.sendPacket(new PacketScenePlayerLocationNotify(this.getScene()));
                 this.resetSendPlayerLocTime();
             }
@@ -1389,6 +1398,8 @@ public class Player implements PlayerHook, FieldFetch {
 
         this.setResinBuyCount(0);
 
+        BirthdayMailSystem.checkAndSend(this, currentDate);
+
         this.setLastDailyReset(currentTime);
     }
 
@@ -1436,8 +1447,8 @@ public class Player implements PlayerHook, FieldFetch {
         var runner = Grasscutter.getThreadPool();
         runner.submit(() -> this.achievements = Achievements.getByPlayer(this));
 
-        runner.submit(this.getAvatars()::loadFromDatabase);
-        runner.submit(this.getInventory()::loadFromDatabase);
+        var avatarsLoad = runner.submit(this.getAvatars()::loadFromDatabase);
+        var inventoryLoad = runner.submit(this.getInventory()::loadFromDatabase);
 
         runner.submit(this.getFriendsList()::loadFromDatabase);
         runner.submit(this.getMailHandler()::loadFromDatabase);
@@ -1446,11 +1457,33 @@ public class Player implements PlayerHook, FieldFetch {
         runner.submit(this::loadBattlePassManager);
         runner.submit(this::loadDailyTaskManager);
 
-        Utils.waitFor(() ->
-            this.getAvatars().isLoaded() &&
-                this.getInventory().isLoaded());
+        // With asyncLogin off this runs on the one thread that handles every player's packets.
+        // Waiting on the loaded flags forever meant a loader that threw - its exception swallowed
+        // by the pool - or a pool full of stuck tasks froze the whole server. Fail this one login
+        // instead.
+        awaitLoad("avatars", avatarsLoad);
+        awaitLoad("inventory", inventoryLoad);
 
         this.getPlayerProgress().setPlayer(this);
+    }
+
+    private static final long LOAD_TIMEOUT_SECONDS = 30;
+
+    private void awaitLoad(String what, java.util.concurrent.Future<?> load) {
+        try {
+            load.get(LOAD_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.ExecutionException e) {
+            throw new IllegalStateException(
+                    "Loading " + what + " for uid " + this.getUid() + " failed.", e.getCause());
+        } catch (java.util.concurrent.TimeoutException e) {
+            load.cancel(true);
+            throw new IllegalStateException(
+                    "Loading " + what + " for uid " + this.getUid() + " took over "
+                            + LOAD_TIMEOUT_SECONDS + "s; the load pool may be stuck.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted loading " + what + " for uid " + this.getUid());
+        }
     }
 
     public void onLogin() {
