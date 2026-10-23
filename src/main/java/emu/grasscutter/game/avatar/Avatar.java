@@ -6,6 +6,7 @@ import dev.morphia.annotations.*;
 import emu.grasscutter.Grasscutter;
 import emu.grasscutter.GameConstants;
 import emu.grasscutter.data.GameData;
+import emu.grasscutter.data.binout.ExtraTalents;
 import emu.grasscutter.data.binout.OpenConfigEntry;
 import emu.grasscutter.data.binout.OpenConfigEntry.SkillPointModifier;
 import emu.grasscutter.data.common.FightPropData;
@@ -421,7 +422,10 @@ public class Avatar {
         this.skillDepot
                 .getSkillsAndEnergySkill()
                 .forEach(
-                        skillId -> map.put(skillId, this.skillLevelMap.putIfAbsent(skillId, 1).intValue()));
+                        // putIfAbsent returns the old value, null for a skill the save has never
+                        // seen, so every avatar saved before a depot gained a skill (the attack
+                        // mode skill, for one) failed to load and its player could not log in.
+                        skillId -> map.put(skillId, this.skillLevelMap.computeIfAbsent(skillId, id -> 1).intValue()));
         return map;
     }
 
@@ -726,6 +730,7 @@ public class Avatar {
         TpsWeaponSystem.applyAffixes(this);
 
         // Add proud skills and unlock them if needed
+        var talentOwners = new HashSet<String>();
         AvatarSkillDepotData skillDepot =
                 GameData.getAvatarSkillDepotDataMap().get(this.getSkillDepotId());
         this.getProudSkillList().clear();
@@ -763,6 +768,7 @@ public class Avatar {
 
             // Add any embryos from this proud skill
             this.addToExtraAbilityEmbryos(proudSkillData.getOpenConfig());
+            talentOwners.add(ExtraTalents.owner(proudSkillData.getOpenConfig()));
         }
 
         // Skill openConfigs (e.g. PlayerGirl_Ice_SkillUpgrade_1 AddAbility for
@@ -784,6 +790,7 @@ public class Avatar {
                                                 .get(skillCfg.getProudSkillGroupId() * 100 + level);
                                 if (skillProud != null) {
                                     this.addToExtraAbilityEmbryos(skillProud.getOpenConfig());
+                                    talentOwners.add(ExtraTalents.owner(skillProud.getOpenConfig()));
                                 }
                             });
         }
@@ -795,6 +802,13 @@ public class Avatar {
                 .filter(Objects::nonNull)
                 .map(AvatarTalentData::getOpenConfig)
                 .filter(Objects::nonNull)
+                .forEach(
+                        openConfig -> {
+                            this.addToExtraAbilityEmbryos(openConfig);
+                            talentOwners.add(ExtraTalents.owner(openConfig));
+                        });
+
+        ExtraTalents.forOwners(talentOwners, this.getAvatarData().getName())
                 .forEach(this::addToExtraAbilityEmbryos);
         // Add any skill strings from this constellation
 
@@ -1236,6 +1250,10 @@ public class Avatar {
         if (expeditionInfo != null) {
             avatarInfo.setExpeditionStateValue(expeditionInfo.getState());
         }
+
+        // 7.x extra level (90->95->100): send the effective max level / extra tier so the
+        // character screen shows the breakthrough; without this the client never enables it.
+        emu.grasscutter.game.avatar.AvatarExtraLevelHelper.applyAvatarInfoExtraLevel(avatarInfo, this);
 
         return avatarInfo.build();
     }

@@ -26,7 +26,7 @@ public final class PacketOpcodes {
     public static final int GetFriendShowAvatarInfoReq = 0;
     public static final int GetFriendShowNameCardInfoReq = 29743;
     public static final int GetHomeLevelUpRewardReq = 2113;
-    public static final int GetProfilePictureDataReq = 0; // 7.1 CmdId unknown (7.0: 2896)
+    public static final int GetProfilePictureDataReq = 27037; // [MIAO] 7.1 开更换界面
     public static final int GetUgcBriefInfoReq = 0;
     public static final int HomeChangeEditModeReq = 29665;
     public static final int HomeChangeModuleReq = 9972;
@@ -1307,7 +1307,7 @@ public final class PacketOpcodes {
     public static final int HomeSetBlueprintSlotOptionReq = 7407;
     public static final int StartCoopPointReq = 3213;
     public static final int AvatarEquipChangeNotify = 24582;
-    public static final int WeaponUpgradeReq = 0; // 7.1 CmdId unknown (7.0: 8563)
+    public static final int WeaponUpgradeReq = 21801;
     public static final int PlayerMatchStopNotify = 20667;
     public static final int BrickBreakerSelectSkillReq = 21401;
     // public static final int BGDAILADEFA = 7083;
@@ -1783,7 +1783,7 @@ public final class PacketOpcodes {
     // public static final int GCGDSCardNumChangeNotify = 26135;
     public static final int PlantFlowerEditFlowerCombinationReq = 27553;
     public static final int RogueDiaryCoinAddNotify = 26917;
-    public static final int CalcWeaponUpgradeReturnItemsReq = 0; // 7.1 CmdId unknown (7.0: 22074)
+    public static final int CalcWeaponUpgradeReturnItemsReq = 7145;
     // public static final int NOIOOPAGMPE = 4280;
     public static final int ItemCdGroupTimeNotify = 25967;
     public static final int AvatarRenameInfoNotify = 209;
@@ -2979,7 +2979,8 @@ public final class PacketOpcodes {
     public static final int ExecuteGadgetLuaRsp = 1263; // 7.1 CmdId unknown (7.0: 1)
     public static final int ForgeStartRsp = 24460; // 7.1 CmdId unknown (7.0: 1)
     public static final int GetHomeLevelUpRewardRsp = 21591; // 7.1 CmdId unknown (7.0: 1)
-    public static final int GetProfilePictureDataRsp = 7323; // 7.1 CmdId unknown (7.0: 20816)
+    public static final int GetProfilePictureDataRsp = 7323;
+    public static final int GetHeadFrameDataReq = 4179; // [MIAO] 7.1 头像框页签
     public static final int GmTalkReq = 0; // 7.1 CmdId unknown (7.0: 1)
     public static final int HomeAvatarSummonEventRsp = 27614; // 7.1 CmdId unknown (7.0: 1)
     public static final int HomeAvatarSummonFinishRsp = 8835; // 7.1 CmdId unknown (7.0: 1)
@@ -3005,7 +3006,7 @@ public final class PacketOpcodes {
     public static final int SceneEntityUpdateNotify = 1936; // 7.1 CmdId unknown (7.0: 1)
     public static final int SceneKickPlayerRsp = 0; // 7.1 CmdId unknown (7.0: 1)
     public static final int SetFriendEnterHomeOptionRsp = 0; // 7.1 CmdId unknown (7.0: 1)
-    public static final int SetPlayerBornDataRsp = 4259; // 7.1 CmdId unknown (7.0: 1)
+    public static final int SetPlayerBornDataRsp = 4385; // 7.1 global, runtime-confirmed
     public static final int SkipPlayerGameTimeRsp = 338; // 7.1 CmdId unknown (7.0: 1)
     public static final int TheaterLobbySceneJumpRsp = 0; // 7.1 CmdId unknown (7.0: 1)
     public static final int TowerMiddleLevelChangeTeamNotify = 0; // 7.1 CmdId unknown (7.0: 1)
